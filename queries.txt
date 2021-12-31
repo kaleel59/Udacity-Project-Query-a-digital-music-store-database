@@ -1,0 +1,88 @@
+/* Query 1 - query used for first insight */
+
+SELECT ar.Name as artist_name,count(t.TrackId)
+from Artist ar
+     join Album al on ar.ArtistId=al.ArtistId
+     join Track t on t.AlbumId=al.AlbumId
+     join Genre g on g.GenreId=t.GenreId and g.Name='Rock'
+group by ar.Name
+order by count(t.TrackId) DESC
+
+
+/* Query 2 - query used for second insight */
+
+CREATE view Top_earn_artist
+ as
+ SELECT a.Name as artist_name,sum(il.UnitPrice*il.Quantity) as Total_price
+ FROM Artist a 
+      JOIN Album al ON a.ArtistId = al.ArtistId 
+      JOIN Track t ON t.AlbumId = al.AlbumId 
+      JOIN InvoiceLine il ON t.TrackId = il.Trackid 
+ group by a.Name
+ order by 2 DESC
+ 
+select *
+from Top_earn_artist
+
+/* Query 3 - query used for third insight */
+
+select a.Name as artist_name,c.CustomerId,c.FirstName,c.LastName,sum(il.UnitPrice*il.Quantity) as Total_price
+FROM Artist a 
+     JOIN Album al ON a.ArtistId = al.ArtistId 
+     JOIN Track t ON t.AlbumId = al.AlbumId 
+     JOIN InvoiceLine il ON t.TrackId = il.Trackid 
+     JOIN Invoice i ON il.InvoiceId = i.InvoiceId 
+     JOIN Customer c on c.CustomerId=I.CustomerId
+where artist_name = 
+                    (select artist_name
+                     from Top_earn_artist
+                     limit 1)
+group by c.CustomerId
+order by 5 DESC
+
+/* Query 4 - query used for fourth insight */
+
+WITH n_purchases_country_genre AS (
+	SELECT
+		COUNT(i.InvoiceId) as Purchases, c.Country, g.Name, g.GenreId
+	FROM Invoice i
+		JOIN Customer c ON i.CustomerId = c.CustomerId
+		JOIN InvoiceLine il ON il.Invoiceid = i.InvoiceId
+		JOIN Track t ON t.TrackId = il.Trackid
+		JOIN Genre g ON t.GenreId = g.GenreId
+	GROUP BY c.Country, g.Name
+	ORDER BY c.Country, Purchases DESC
+	),
+max_n_purchases_country as (
+    SELECT MAX(Purchases) AS max_n_purchases, Country, Name, GenreId
+	FROM n_purchases_country_genre
+	GROUP BY Country
+    )
+SELECT n.Purchases,n.Country,n.Name,n.GenreId
+FROM n_purchases_country_genre n
+JOIN max_n_purchases_country m ON n.Country = m.Country and n.Purchases=m.max_n_purchases
+order by n.Country,n.Name
+
+/* Query 5 - query used for fifth insight */
+
+WITH Tot_cus_country AS 
+(
+	SELECT c.Country, SUM(i.Total) TotalSpent, c.FirstName, c.LastName, c.CustomerId
+	FROM 
+		Customer c
+		JOIN Invoice i ON c.CustomerId = i.CustomerId
+	GROUP BY c.CustomerId
+),
+ Max_Tot_cus_country as 
+ (
+ SELECT Country, MAX(TotalSpent) AS MaxTotalSpent, FirstName, LastName, CustomerId
+	FROM Tot_cus_country 
+	GROUP BY Country
+ )
+
+SELECT t.*
+FROM Tot_cus_country t
+JOIN Max_Tot_cus_country m
+ON t.Country = m.Country
+WHERE t.TotalSpent = m.MaxTotalSpent
+ORDER BY Country;
